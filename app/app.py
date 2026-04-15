@@ -2,13 +2,16 @@ import os
 import sys
 import tempfile
 import streamlit as st
+from dotenv import load_dotenv
 
 # Add project root to path so src imports work
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+load_dotenv()
+
 from src.pipeline.rag_pipeline import RAGPipeline
 
-GROQ_API_KEY = "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"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 st.set_page_config(page_title="RAG Q&A System", layout="wide")
 st.title("RAG-based Question Answering System")
