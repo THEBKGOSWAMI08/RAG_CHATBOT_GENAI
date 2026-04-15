@@ -1,58 +1,84 @@
-import chromadb
+import os
+import pickle
+import numpy as np
+import faiss
 from langchain.schema import Document
 
 from src.embedding.embedder import Embedder
 
 
 class VectorDB:
-    def __init__(
-        self,
-        collection_name: str = "rag_collection",
-        persist_directory: str = "./chroma_db",
-    ):
-        self.client = chromadb.PersistentClient(path=persist_directory)
-        self.collection = self.client.get_or_create_collection(
-            name=collection_name,
-            metadata={"hnsw:space": "cosine"},
-        )
+    def __init__(self, persist_directory: str = "./faiss_db"):
+        self.persist_directory = persist_directory
         self.embedder = Embedder()
+        self.index = None
+        self.documents: list[str] = []
+        self.metadatas: list[dict] = []
+        self.dimension = 384  # all-MiniLM-L6-v2 output dimension
+
+        os.makedirs(persist_directory, exist_ok=True)
+        self._load()
+
+    def _index_path(self):
+        return os.path.join(self.persist_directory, "index.faiss")
+
+    def _docs_path(self):
+        return os.path.join(self.persist_directory, "docs.pkl")
+
+    def _load(self):
+        """Load existing FAISS index and documents from disk if available."""
+        if os.path.exists(self._index_path()) and os.path.exists(self._docs_path()):
+            self.index = faiss.read_index(self._index_path())
+            with open(self._docs_path(), "rb") as f:
+                data = pickle.load(f)
+                self.documents = data["documents"]
+                self.metadatas = data["metadatas"]
+        else:
+            self.index = faiss.IndexFlatL2(self.dimension)
+
+    def _save(self):
+        """Persist FAISS index and documents to disk."""
+        faiss.write_index(self.index, self._index_path())
+        with open(self._docs_path(), "wb") as f:
+            pickle.dump(
+                {"documents": self.documents, "metadatas": self.metadatas}, f
+            )
 
     def add_documents(self, documents: list[Document]) -> None:
-        """Add documents and their embeddings to the vector store."""
+        """Embed and add documents to the FAISS index."""
         texts = [doc.page_content for doc in documents]
         metadatas = [doc.metadata for doc in documents]
         embeddings = self.embedder.embed_texts(texts)
-        ids = [f"doc_{i}" for i in range(len(texts))]
 
-        self.collection.add(
-            documents=texts,
-            embeddings=embeddings,
-            metadatas=metadatas,
-            ids=ids,
-        )
+        vectors = np.array(embeddings, dtype="float32")
+        self.index.add(vectors)
+        self.documents.extend(texts)
+        self.metadatas.extend(metadatas)
+        self._save()
 
     def query(self, query_text: str, top_k: int = 5) -> list[dict]:
-        """Query the vector store and return the most similar documents."""
-        query_embedding = self.embedder.embed_query(query_text)
-        results = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=top_k,
-            include=["documents", "metadatas", "distances"],
-        )
+        """Search the FAISS index for the most similar documents."""
+        if self.index.ntotal == 0:
+            return []
 
-        docs = []
-        for i in range(len(results["documents"][0])):
-            docs.append({
-                "content": results["documents"][0][i],
-                "metadata": results["metadatas"][0][i],
-                "distance": results["distances"][0][i],
-            })
-        return docs
+        query_embedding = np.array(
+            [self.embedder.embed_query(query_text)], dtype="float32"
+        )
+        distances, indices = self.index.search(query_embedding, min(top_k, self.index.ntotal))
+
+        results = []
+        for dist, idx in zip(distances[0], indices[0]):
+            if idx != -1:
+                results.append({
+                    "content": self.documents[idx],
+                    "metadata": self.metadatas[idx],
+                    "distance": float(dist),
+                })
+        return results
 
     def reset(self) -> None:
-        """Delete all documents from the collection."""
-        self.client.delete_collection(self.collection.name)
-        self.collection = self.client.get_or_create_collection(
-            name=self.collection.name,
-            metadata={"hnsw:space": "cosine"},
-        )
+        """Clear the FAISS index and all stored documents."""
+        self.index = faiss.IndexFlatL2(self.dimension)
+        self.documents = []
+        self.metadatas = []
+        self._save()

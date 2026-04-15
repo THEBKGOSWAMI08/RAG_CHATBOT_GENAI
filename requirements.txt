@@ -1,9 +1,10 @@
 langchain
 langchain-community
 langchain-groq
-chromadb
+faiss-cpu
 sentence-transformers
 pypdf
 python-docx
 streamlit
 python-dotenv
+groq

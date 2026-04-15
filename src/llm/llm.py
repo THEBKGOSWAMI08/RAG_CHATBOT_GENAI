@@ -8,12 +8,14 @@ class LLM:
         self.model = model
         self.client = Groq(api_key=self.api_key)
 
-    def generate(self, query: str, context: str) -> str:
-        """Generate a response using retrieved context and the user query."""
+    def generate(self, query: str, context: str, history: str = "") -> str:
+        """Generate a response using retrieved context, memory, and the user query."""
+        history_section = f"Conversation History:\n{history}\n\n" if history else ""
         prompt = (
             "You are a helpful assistant. Answer the user's question based only on "
             "the provided context. If the context does not contain enough information, "
             "say so clearly.\n\n"
+            f"{history_section}"
             f"Context:\n{context}\n\n"
             f"Question: {query}\n\n"
             "Answer:"
