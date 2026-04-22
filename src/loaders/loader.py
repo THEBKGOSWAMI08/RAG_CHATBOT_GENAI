@@ -1,6 +1,6 @@
 import os
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 
 def load_pdf(file_path: str) -> list[Document]:

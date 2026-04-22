@@ -1,7 +1,11 @@
 # Virtual environment
 venv/
 env/
+.venv/
 .env
+
+# Vector store (regenerated from ingestion)
+faiss_db/
 
 # Python cache
 __pycache__/
@@ -25,3 +29,9 @@ Thumbs.db
 # Uploaded/temp files
 *.tmp
 uploads/
+
+# Streamlit secrets (keep .streamlit/config.toml, ignore secrets)
+.streamlit/secrets.toml
+
+# HuggingFace model cache (optional - uncomment if you don't want it in backups)
+# .cache/

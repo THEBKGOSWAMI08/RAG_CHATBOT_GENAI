@@ -2,7 +2,7 @@ import os
 import pickle
 import numpy as np
 import faiss
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 from src.embedding.embedder import Embedder
 

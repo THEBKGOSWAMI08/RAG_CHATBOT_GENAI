@@ -14,11 +14,16 @@ from src.pipeline.rag_pipeline import RAGPipeline
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 st.set_page_config(page_title="RAG Q&A System", layout="wide")
-st.title("RAG-based Question Answering System")
+st.title("RAG-based Chatbot")
 
-# Initialize pipeline in session state
+
+@st.cache_resource(show_spinner="Loading models (first launch only)...")
+def build_pipeline(api_key: str) -> RAGPipeline:
+    return RAGPipeline(groq_api_key=api_key)
+
+
 if "pipeline" not in st.session_state:
-    st.session_state.pipeline = RAGPipeline(groq_api_key=GROQ_API_KEY)
+    st.session_state.pipeline = build_pipeline(GROQ_API_KEY)
     st.session_state.ingested = False
 
 # --- Sidebar: Upload Documents ---
